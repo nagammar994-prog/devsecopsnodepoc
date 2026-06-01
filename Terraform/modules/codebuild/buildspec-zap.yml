@@ -1,0 +1,35 @@
+version: 0.2
+
+env:
+  variables:
+    TARGET_URL: "http://replace-with-alb-dns"
+
+phases:
+
+  install:
+    commands:
+
+      - echo "Installing OWASP ZAP"
+
+      - wget https://github.com/zaproxy/zaproxy/releases/latest/download/ZAP_WEEKLY_D_linux.tar.gz
+
+      - tar -xzf ZAP_WEEKLY_D_linux.tar.gz
+
+  build:
+    commands:
+
+      - echo "Running OWASP ZAP"
+
+      - ./ZAP*/zap-baseline.py \
+        -t $TARGET_URL \
+        -r zap-report.html
+
+      - |
+        if grep -q "FAIL-NEW" zap-report.html; then
+          echo "High severity findings detected"
+          exit 1
+        fi
+
+artifacts:
+  files:
+    - zap-report.html

@@ -1,0 +1,12 @@
+variable "pipeline_name" {}
+variable "pipeline_role_arn" {}
+variable "artifact_bucket_name" {}
+variable "codestar_connection_arn" {}
+variable "github_repository_id" {}
+variable "github_branch" {}
+variable "ecs_cluster_name" {}
+variable "ecs_service_name" {}
+variable "codebuild_security_project_name" {}
+variable "codebuild_build_project_name" {}
+variable "codebuild_zap_project_name" {}
+variable "tags" {}

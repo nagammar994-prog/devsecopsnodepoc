@@ -1,0 +1,9 @@
+variable "security_build_name" {}
+variable "zap_build_name" {}
+variable "codebuild_role_arn" {}
+variable "compute_type" {}
+variable "docker_image" {}
+variable "aws_region" {}
+variable "aws_account_id" {}
+variable "target_url" {}
+variable "tags" {}
