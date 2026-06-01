@@ -11,67 +11,78 @@ phases:
       nodejs: 18
 
     commands:
-      - echo "Installing tools"
+      - echo "Installing security tools"
 
       # Checkov
       - pip3 install checkov
 
-      # tfsec
-      - curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+      # Terraform
+      - curl -fsSL https://apt.releases.hashicorp.com/gpg | apt-key add -
+      - apt-get update -y
+      - apt-get install -y terraform
 
       # Trivy
       - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
 
+      # tfsec
+      - curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+
       # Gitleaks
-      - curl -sL -o gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_8.24.2_linux_x64.tar.gz || (echo "gitleaks download failed" && exit 1)
+      - curl -sSL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64.tar.gz -o gitleaks.tar.gz
       - tar -xzf gitleaks.tar.gz
       - chmod +x gitleaks
 
   pre_build:
     commands:
+      - echo "Logging in to Amazon ECR"
 
-      - echo "ECR Login"
-
-      - aws ecr get-login-password | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
+      - aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
 
       - IMAGE_TAG=${CODEBUILD_BUILD_NUMBER}
 
       - IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}:${IMAGE_TAG}
 
+      - echo "Installing Node dependencies"
+      - cd app
       - npm install
+      - cd ..
 
   build:
     commands:
 
-      - echo "Secrets Scan"
+      - echo "Running Gitleaks"
       - ./gitleaks detect --source . --exit-code 1
 
-      - echo "Dependency Scan"
+      - echo "Running npm audit"
+      - cd app
       - npm audit --audit-level=high
+      - cd ..
 
-      - echo "Docker Build"
+      - echo "Building Docker image"
       - docker build -t ${IMAGE_URI} ./app
 
-      - echo "Trivy Scan"
+      - echo "Running Trivy scan"
       - ./bin/trivy image --exit-code 1 --severity HIGH,CRITICAL ${IMAGE_URI}
 
       - echo "Terraform Validation"
-      - terraform -chdir=terraform init -backend=false
+      - terraform -chdir=Terraform/dev init -backend=false
 
-      - terraform -chdir=terraform validate
+      - terraform -chdir=Terraform/dev validate
 
-      - echo "Checkov"
-      - checkov -d terraform
+      - echo "Running Checkov"
+      - checkov -d Terraform
 
-      - echo "tfsec"
-      - tfsec terraform
+      - echo "Running tfsec"
+      - tfsec Terraform
 
   post_build:
     commands:
 
+      - echo "Pushing Docker image"
+
       - docker push ${IMAGE_URI}
 
-      - echo "[{\"name\":\"devsecops-poc\",\"imageUri\":\"${IMAGE_URI}\"}]" > imagedefinitions.json
+      - printf '[{"name":"devsecops-app","imageUri":"%s"}]' ${IMAGE_URI} > imagedefinitions.json
 
 artifacts:
   files:
