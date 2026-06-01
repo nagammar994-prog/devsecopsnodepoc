@@ -178,7 +178,7 @@ variable "github_repository_id" {
 
 variable "github_branch" {
   type    = string
-  default = "main"
+  default = "feature123"
 }
 
 variable "ecs_service_name" {
