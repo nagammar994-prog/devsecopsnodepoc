@@ -14,40 +14,39 @@ nodejs: 18
 commands:
   - echo "Installing security tools"
 
-  # Verify Terraform
   - terraform version || echo "Terraform not found"
 
-  # Checkov
   - pip3 install checkov
 
-  # Trivy
   - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
 
-  # tfsec
   - curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
 
-  # Gitleaks
   - GITLEAKS_VERSION=8.24.2
+
   - curl -Lo gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
+
   - tar -xzf gitleaks.tar.gz
+
   - chmod +x gitleaks
 ```
 
 pre_build:
 commands:
-- echo "Logging in to Amazon ECR"
 
 ```
+  - echo "Logging in to Amazon ECR"
+
   - aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
 
-  - IMAGE_TAG=${CODEBUILD_BUILD_NUMBER}
+  - export IMAGE_TAG=${CODEBUILD_BUILD_NUMBER}
 
-  - IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}:${IMAGE_TAG}
-
-  - echo "Installing Node dependencies"
+  - export IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}:${IMAGE_TAG}
 
   - cd app
+
   - npm install
+
   - cd ..
 ```
 
@@ -56,17 +55,23 @@ commands:
 
 ```
   - echo "Running Gitleaks"
+
   - ./gitleaks detect --source . --exit-code 1
 
   - echo "Running npm audit"
+
   - cd app
+
   - npm audit --audit-level=high || true
+
   - cd ..
 
   - echo "Building Docker image"
+
   - docker build -t ${IMAGE_URI} ./app
 
   - echo "Running Trivy"
+
   - ./bin/trivy image --exit-code 1 --severity HIGH,CRITICAL ${IMAGE_URI}
 
   - echo "Terraform Validation"
