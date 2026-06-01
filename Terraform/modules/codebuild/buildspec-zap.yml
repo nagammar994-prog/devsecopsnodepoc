@@ -12,17 +12,15 @@ phases:
       - echo "Installing OWASP ZAP"
 
       - wget https://github.com/zaproxy/zaproxy/releases/latest/download/ZAP_WEEKLY_D_linux.tar.gz
-
-      - tar -xzf ZAP_WEEKLY_D_linux.tar.gz
+        - curl -sL -o zap.tar.gz https://github.com/zaproxy/zaproxy/releases/latest/download/ZAP_WEEKLY_D_linux.tar.gz || (echo "zap download failed" && exit 1)
+        - tar -xzf zap.tar.gz
 
   build:
     commands:
 
       - echo "Running OWASP ZAP"
 
-      - ./ZAP*/zap-baseline.py \
-        -t $TARGET_URL \
-        -r zap-report.html
+        - ./ZAP*/zap-baseline.py -t $TARGET_URL -r zap-report.html
 
       - |
         if grep -q "FAIL-NEW" zap-report.html; then

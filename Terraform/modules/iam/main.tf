@@ -135,7 +135,8 @@ resource "aws_iam_role_policy" "pipeline_policy" {
           "codebuild:BatchGetBuilds",
           "codebuild:BatchGetReports",
           "codebuild:CreateReport",
-          "codebuild:UpdateReport"
+          "codebuild:UpdateReport",
+          "codebuild:StartBuild"
         ]
 
         Resource = "*"
@@ -163,6 +164,24 @@ resource "aws_iam_role_policy" "pipeline_policy" {
         ]
 
         Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "pipeline_passrole_policy" {
+  name = "${var.pipeline_policy_name}-passrole"
+  role = aws_iam_role.pipeline_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:PassRole"
+        ]
+        Resource = aws_iam_role.codebuild_role.arn
       }
     ]
   })

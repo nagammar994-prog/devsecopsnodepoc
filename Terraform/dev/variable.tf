@@ -173,12 +173,12 @@ variable "codestar_connection_arn" {
 
 variable "github_repository_id" {
   type    = string
-  default = "your-github-user/devsecops-poc"
+  default = "nagammar994-prog/devsecopsnodepoc"
 }
 
 variable "github_branch" {
   type    = string
-  default = "feature123"
+  default = "main"
 }
 
 variable "ecs_service_name" {

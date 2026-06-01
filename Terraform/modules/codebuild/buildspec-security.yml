@@ -23,8 +23,8 @@ phases:
       - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
 
       # Gitleaks
-      - wget -q https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_8.24.2_linux_x64.tar.gz
-      - tar -xzf gitleaks_8.24.2_linux_x64.tar.gz
+      - curl -sL -o gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_8.24.2_linux_x64.tar.gz || (echo "gitleaks download failed" && exit 1)
+      - tar -xzf gitleaks.tar.gz
       - chmod +x gitleaks
 
   pre_build:
@@ -32,11 +32,7 @@ phases:
 
       - echo "ECR Login"
 
-      - aws ecr get-login-password \
-        | docker login \
-        --username AWS \
-        --password-stdin \
-        ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
+      - aws ecr get-login-password | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
 
       - IMAGE_TAG=${CODEBUILD_BUILD_NUMBER}
 
