@@ -72,7 +72,7 @@ phases:
       - echo "========== TFSEC =========="
       - tfsec Terraform || true
 
-      - echo "========== TRIVY FILESYSTEM =========="
+      - echo "========== TRIVY FILESYSTEM SCAN =========="
       - ./bin/trivy fs . --severity HIGH,CRITICAL --exit-code 0
 
       - echo "========== DOCKER BUILD =========="
@@ -92,10 +92,9 @@ phases:
       - echo "========== CREATE IMAGEDEFINITIONS =========="
       - printf '[{"name":"devsecops-app","imageUri":"%s"}]' ${IMAGE_URI} > imagedefinitions.json
 
-  finally:
-    commands:
       - echo "========== BUILD COMPLETE =========="
       - ls -ltr
+
       - cat imagedefinitions.json || true
 
 artifacts:
