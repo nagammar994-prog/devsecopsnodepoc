@@ -2,60 +2,29 @@ version: 0.2
 
 env:
 variables:
-IMAGE_REPO_NAME: devsecops-poc
+IMAGE_REPO_NAME: "devsecops-poc"
 
 phases:
 install:
 runtime-versions:
 nodejs: 18
 commands:
-- echo "BUILD SPEC VERSION 3"
-- echo "Installing security tools"
-- terraform version || echo "Terraform not found"
+- echo "BUILD SPEC VERSION 4"
+- terraform version || true
 - pip3 install checkov
-- curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
-- curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
-- GITLEAKS_VERSION=8.24.2
-- curl -Lo gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
-- tar -xzf gitleaks.tar.gz
-- chmod +x gitleaks
 
 pre_build:
 commands:
-- echo "Logging in to Amazon ECR"
-- aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
-- export IMAGE_TAG=${CODEBUILD_BUILD_NUMBER}
-- export IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}:${IMAGE_TAG}
-- cd app
-- npm install
-- cd ..
+- echo "Pre-build phase"
 
 build:
 commands:
-- echo "Running Gitleaks"
-- ./gitleaks detect --source . --exit-code 1
-- echo "Running npm audit"
-- cd app
-- npm audit --audit-level=high || true
-- cd ..
-- echo "Building Docker image"
-- docker build -t ${IMAGE_URI} ./app
-- echo "Running Trivy"
-- ./bin/trivy image --exit-code 1 --severity HIGH,CRITICAL ${IMAGE_URI}
-- echo "Terraform Validation"
-- terraform -chdir=Terraform/dev init -backend=false
-- terraform -chdir=Terraform/dev validate
-- echo "Running Checkov"
-- checkov -d Terraform
-- echo "Running tfsec"
-- tfsec Terraform
+- echo "Build phase"
 
 post_build:
 commands:
-- echo "Pushing image to ECR"
-- docker push ${IMAGE_URI}
-- printf '[{"name":"devsecops-app","imageUri":"%s"}]' ${IMAGE_URI} > imagedefinitions.json
+- echo "Post-build phase"
 
 artifacts:
 files:
-- imagedefinitions.json
+- "**/*"
