@@ -31,7 +31,7 @@ phases:
       - tar -xzf gitleaks.tar.gz
 
       - chmod +x gitleaks
-
+     
   pre_build:
     commands:
       - echo "Logging in to Amazon ECR"
