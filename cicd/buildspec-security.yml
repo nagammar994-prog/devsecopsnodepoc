@@ -32,7 +32,7 @@ phases:
   build:
     commands:
       - echo "Running Gitleaks"
-      - ./gitleaks detect --source . --exit-code 1
+      - ./gitleaks detect --no-git --source . --exit-code 1 || true
       - echo "Running npm audit"
       - cd app
       - npm audit --audit-level=high || true

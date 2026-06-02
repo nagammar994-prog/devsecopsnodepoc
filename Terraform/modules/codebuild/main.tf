@@ -50,7 +50,7 @@ resource "aws_codebuild_project" "zap_dast" {
     compute_type    = var.compute_type
     image           = var.docker_image
     type            = "LINUX_CONTAINER"
-    privileged_mode = false
+    privileged_mode = true
 
     environment_variable {
       name  = "TARGET_URL"
