@@ -23,8 +23,11 @@ phases:
       - pip3 install checkov
 
       # tfsec
-      - curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
-
+      - TFSEC_VERSION=1.28.14
+      - wget https://github.com/aquasecurity/tfsec/releases/download/v${TFSEC_VERSION}/tfsec-linux-amd64
+      - chmod +x tfsec-linux-amd64
+      - mv tfsec-linux-amd64 /usr/local/bin/tfsec
+      - tfsec --version
       # Trivy
       - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
 

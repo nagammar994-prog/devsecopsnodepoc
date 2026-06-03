@@ -43,20 +43,17 @@ resource "aws_iam_role_policy" "codebuild_policy" {
           "ecr:InitiateLayerUpload",
           "ecr:UploadLayerPart",
           "ecr:CompleteLayerUpload",
-          "ecr:BatchCheckLayerAvailability"
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:DescribeRepositories",
+          "ecr:ListImages"
         ]
-        Resource = var.allow_ecr_resources
+        Resource = "*"
       },
 
       {
         Effect = "Allow"
         Action = [
-          "ecs:UpdateService",
-          "ecs:DescribeServices",
-          "ecs:DescribeTaskDefinition",
-          "ecs:DescribeTasks",
-          "ecs:ListTasks",
-          "ecs:RegisterTaskDefinition"
+          "ecs:*"
         ]
         Resource = "*"
       },
@@ -66,18 +63,16 @@ resource "aws_iam_role_policy" "codebuild_policy" {
         Action = [
           "s3:GetObject",
           "s3:PutObject",
-          "s3:GetObjectVersion"
+          "s3:GetObjectVersion",
+          "s3:ListBucket"
         ]
-        Resource = var.allow_s3_resources
+        Resource = "*"
       },
 
       {
         Effect = "Allow"
         Action = [
-          "codebuild:BatchGetBuilds",
-          "codebuild:BatchGetReports",
-          "codebuild:CreateReport",
-          "codebuild:UpdateReport"
+          "codebuild:*"
         ]
         Resource = "*"
       }
@@ -111,59 +106,56 @@ resource "aws_iam_role_policy" "pipeline_policy" {
   role = aws_iam_role.pipeline_role.id
 
   policy = jsonencode({
-
     Version = "2012-10-17"
 
     Statement = [
 
       {
         Effect = "Allow"
-
         Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:GetObjectVersion",
-          "s3:GetBucketVersioning"
+          "s3:*"
         ]
-
-        Resource = var.allow_s3_resources
-      },
-
-      {
-        Effect = "Allow"
-
-        Action = [
-          "codebuild:BatchGetBuilds",
-          "codebuild:BatchGetReports",
-          "codebuild:CreateReport",
-          "codebuild:UpdateReport",
-          "codebuild:StartBuild"
-        ]
-
         Resource = "*"
       },
 
       {
         Effect = "Allow"
-
         Action = [
-          "ecs:UpdateService",
-          "ecs:DescribeServices",
-          "ecs:DescribeTaskDefinition",
-          "ecs:DescribeTasks",
-          "ecs:ListTasks"
+          "codebuild:*"
         ]
-
         Resource = "*"
       },
 
       {
         Effect = "Allow"
-
         Action = [
-          "codestar-connections:UseConnection"
+          "ecs:*"
         ]
+        Resource = "*"
+      },
 
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticloadbalancing:*"
+        ]
+        Resource = "*"
+      },
+
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:PassRole"
+        ]
+        Resource = "*"
+      },
+
+      {
+        Effect = "Allow"
+        Action = [
+          "codestar-connections:UseConnection",
+          "codeconnections:UseConnection"
+        ]
         Resource = "*"
       }
     ]
@@ -171,18 +163,22 @@ resource "aws_iam_role_policy" "pipeline_policy" {
 }
 
 resource "aws_iam_role_policy" "pipeline_passrole_policy" {
+
   name = "${var.pipeline_policy_name}-passrole"
   role = aws_iam_role.pipeline_role.id
 
   policy = jsonencode({
     Version = "2012-10-17"
+
     Statement = [
       {
         Effect = "Allow"
+
         Action = [
           "iam:PassRole"
         ]
-        Resource = aws_iam_role.codebuild_role.arn
+
+        Resource = "*"
       }
     ]
   })

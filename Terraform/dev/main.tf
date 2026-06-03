@@ -16,12 +16,12 @@ module "vpc" {
 module "security_groups" {
   source = "../modules/security_groups"
 
-  vpc_id                       = module.vpc.vpc_id
-  alb_security_group_name      = var.alb_security_group_name
-  ecs_security_group_name      = var.ecs_security_group_name
-  alb_ingress_port             = var.alb_ingress_port
-  alb_ingress_cidr_blocks      = var.alb_ingress_cidr_blocks
-  ecs_ingress_port             = var.ecs_ingress_port
+  vpc_id                  = module.vpc.vpc_id
+  alb_security_group_name = var.alb_security_group_name
+  ecs_security_group_name = var.ecs_security_group_name
+  alb_ingress_port        = var.alb_ingress_port
+  alb_ingress_cidr_blocks = var.alb_ingress_cidr_blocks
+  ecs_ingress_port        = var.ecs_ingress_port
 
   tags = var.common_tags
 }
@@ -30,13 +30,13 @@ module "security_groups" {
 module "alb" {
   source = "../modules/alb"
 
-  alb_name                = var.alb_name
-  alb_internal            = var.alb_internal
-  alb_security_group_ids  = [module.security_groups.alb_security_group_id]
-  subnet_ids              = module.vpc.public_subnet_ids
-  vpc_id                  = module.vpc.vpc_id
-  container_port          = var.container_port
-  listener_port           = var.alb_ingress_port
+  alb_name               = var.alb_name
+  alb_internal           = var.alb_internal
+  alb_security_group_ids = [module.security_groups.alb_security_group_id]
+  subnet_ids             = module.vpc.public_subnet_ids
+  vpc_id                 = module.vpc.vpc_id
+  container_port         = var.container_port
+  listener_port          = var.alb_ingress_port
 
   tags = var.common_tags
 }
@@ -71,19 +71,19 @@ module "ecr" {
 module "ecs" {
   source = "../modules/ecs"
 
-  ecs_cluster_name         = var.ecs_cluster_name
-  ecs_cluster_setting      = var.ecs_cluster_setting
+  ecs_cluster_name          = var.ecs_cluster_name
+  ecs_cluster_setting       = var.ecs_cluster_setting
   ecs_cluster_setting_value = var.ecs_cluster_setting_value
-  vpc_id                   = module.vpc.vpc_id
-  aws_account_id           = data.aws_caller_identity.current.account_id
-  aws_region               = var.aws_region
-  ecr_repository_name      = var.ecr_repository_name
-  private_subnet_ids       = module.vpc.private_subnet_ids
-  public_subnets           = module.vpc.public_subnet_ids
-  ecs_security_group_id    = module.security_groups.ecs_security_group_id
-  desired_count            = var.desired_count
-  container_port           = var.container_port
-  target_group_arn         = module.alb.target_group_arn
+  vpc_id                    = module.vpc.vpc_id
+  aws_account_id            = data.aws_caller_identity.current.account_id
+  aws_region                = var.aws_region
+  ecr_repository_name       = var.ecr_repository_name
+  private_subnet_ids        = module.vpc.private_subnet_ids
+  public_subnets            = module.vpc.public_subnet_ids
+  ecs_security_group_id     = module.security_groups.ecs_security_group_id
+  desired_count             = var.desired_count
+  container_port            = var.container_port
+  target_group_arn          = module.alb.target_group_arn
 
   tags = var.common_tags
 }
@@ -102,13 +102,13 @@ module "cloudwatch" {
 module "iam" {
   source = "../modules/iam"
 
-  environment              = var.environment
-  codebuild_role_name      = var.codebuild_role_name
-  codebuild_policy_name    = var.codebuild_policy_name
-  pipeline_role_name       = var.pipeline_role_name
-  pipeline_policy_name     = var.pipeline_policy_name
-  allow_ecr_resources      = var.allow_ecr_resources
-  allow_s3_resources       = var.allow_s3_resources
+  environment           = var.environment
+  codebuild_role_name   = var.codebuild_role_name
+  codebuild_policy_name = var.codebuild_policy_name
+  pipeline_role_name    = var.pipeline_role_name
+  pipeline_policy_name  = var.pipeline_policy_name
+  allow_ecr_resources   = var.allow_ecr_resources
+  allow_s3_resources    = var.allow_s3_resources
 
   tags = var.common_tags
 }
@@ -117,14 +117,14 @@ module "iam" {
 module "codebuild" {
   source = "../modules/codebuild"
 
-  security_build_name    = var.security_build_name
-  zap_build_name         = var.zap_build_name
-  codebuild_role_arn     = module.iam.codebuild_role_arn
-  compute_type           = var.compute_type
-  docker_image           = var.docker_image
-  aws_region             = var.aws_region
-  aws_account_id         = data.aws_caller_identity.current.account_id
-  target_url             = module.alb.alb_dns_name
+  security_build_name = var.security_build_name
+  zap_build_name      = var.zap_build_name
+  codebuild_role_arn  = module.iam.codebuild_role_arn
+  compute_type        = var.compute_type
+  docker_image        = var.docker_image
+  aws_region          = var.aws_region
+  aws_account_id      = data.aws_caller_identity.current.account_id
+  target_url          = module.alb.alb_dns_name
 
   tags = var.common_tags
 }
@@ -136,8 +136,8 @@ module "codepipeline" {
   pipeline_name                   = var.pipeline_name
   pipeline_role_arn               = module.iam.pipeline_role_arn
   artifact_bucket_name            = aws_s3_bucket.artifacts.id
-  codestar_connection_arn          = var.codestar_connection_arn != "" ? var.codestar_connection_arn : "arn:aws:codestar-connections:us-east-1:${data.aws_caller_identity.current.account_id}:connection/github-placeholder"
-  github_repository_id             = var.github_repository_id
+  codestar_connection_arn         = var.codestar_connection_arn != "" ? var.codestar_connection_arn : "arn:aws:codestar-connections:us-east-1:${data.aws_caller_identity.current.account_id}:connection/github-placeholder"
+  github_repository_id            = var.github_repository_id
   github_branch                   = var.github_branch
   ecs_cluster_name                = module.ecs.ecs_cluster_name
   ecs_service_name                = var.ecs_service_name
