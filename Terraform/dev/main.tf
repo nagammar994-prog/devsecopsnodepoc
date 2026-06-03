@@ -34,6 +34,9 @@ module "alb" {
   alb_internal            = var.alb_internal
   alb_security_group_ids  = [module.security_groups.alb_security_group_id]
   subnet_ids              = module.vpc.public_subnet_ids
+  vpc_id                  = module.vpc.vpc_id
+  container_port          = var.container_port
+  listener_port           = var.alb_ingress_port
 
   tags = var.common_tags
 }
@@ -71,6 +74,16 @@ module "ecs" {
   ecs_cluster_name         = var.ecs_cluster_name
   ecs_cluster_setting      = var.ecs_cluster_setting
   ecs_cluster_setting_value = var.ecs_cluster_setting_value
+  vpc_id                   = module.vpc.vpc_id
+  aws_account_id           = data.aws_caller_identity.current.account_id
+  aws_region               = var.aws_region
+  ecr_repository_name      = var.ecr_repository_name
+  private_subnet_ids       = module.vpc.private_subnet_ids
+  public_subnets           = module.vpc.public_subnet_ids
+  ecs_security_group_id    = module.security_groups.ecs_security_group_id
+  desired_count            = var.desired_count
+  container_port           = var.container_port
+  target_group_arn         = module.alb.target_group_arn
 
   tags = var.common_tags
 }

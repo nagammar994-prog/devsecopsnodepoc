@@ -216,3 +216,22 @@ variable "ecs_ingress_port" {
   type    = number
   default = 3000
 }
+
+# ECS runtime overrides
+variable "desired_count" {
+  type    = number
+  default = 1
+}
+
+variable "container_port" {
+  type    = number
+  default = 3000
+}
+
+variable "target_group_arn" {
+  default = "arn:aws:elasticloadbalancing:us-east-1:442391649779:targetgroup/devsecops-tg/1a8b04497920ecb2"
+}
+
+variable "vpc_id" {
+  default = "vpc-04aeee3c5b9188af7"
+}
