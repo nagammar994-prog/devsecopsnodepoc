@@ -29,7 +29,7 @@ phases:
 
       # Gitleaks
       - GITLEAKS_VERSION=8.24.2
-      - wget https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
+      - wget -q https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
       - tar -xzf gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
       - chmod +x gitleaks
       - mv gitleaks /usr/local/bin/
@@ -75,6 +75,7 @@ phases:
       - echo "========== CREATE IMAGEDEFINITIONS =========="
       - printf '[{"name":"devsecops-app","imageUri":"%s"}]' ${IMAGE_URI} > imagedefinitions.json
 
+      - echo "========== IMAGE DEFINITIONS =========="
       - cat imagedefinitions.json
 
 artifacts:
