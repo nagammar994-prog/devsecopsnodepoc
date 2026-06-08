@@ -1,105 +1,103 @@
 version: 0.2
 
 env:
-  variables:
-    IMAGE_REPO_NAME: "devsecops-poc"
+variables:
+IMAGE_REPO_NAME: "devsecops-poc"
 
 phases:
-  install:
-    runtime-versions:
-      nodejs: 18
+install:
+runtime-versions:
+nodejs: 18
 
-    commands:
-      - echo "Installing Security Tools"
+```
+commands:
+  - echo "Installing Security Tools"
 
-      # Terraform
-      - TERRAFORM_VERSION=1.9.8
-      - curl -Lo terraform.zip https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
-      - unzip -o terraform.zip
-      - mv terraform /usr/local/bin/
-      - terraform version
+  # Terraform
+  - TERRAFORM_VERSION=1.9.8
+  - curl -Lo terraform.zip https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+  - unzip -o terraform.zip
+  - mv terraform /usr/local/bin/
+  - terraform version
 
-      # Checkov
-      - pip3 install checkov
+  # Semgrep
+  - pip3 install semgrep
 
-      # tfsec
-      - TFSEC_VERSION=1.28.14
-      - wget https://github.com/aquasecurity/tfsec/releases/download/v${TFSEC_VERSION}/tfsec-linux-amd64
-      - chmod +x tfsec-linux-amd64
-      - mv tfsec-linux-amd64 /usr/local/bin/tfsec
-      - tfsec --version
-      # Trivy
-      - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
+  # Checkov
+  - pip3 install checkov
 
-      # Gitleaks
-      - GITLEAKS_VERSION=8.24.2
-      - curl -Lo gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
-      - tar -xzf gitleaks.tar.gz
-      - chmod +x gitleaks
+  # Trivy
+  - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
 
-  pre_build:
-    commands:
-      - echo "Logging in to Amazon ECR"
+  # Gitleaks
+  - GITLEAKS_VERSION=8.24.2
+  - curl -Lo gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
+  - tar -xzf gitleaks.tar.gz
+  - chmod +x gitleaks
+```
 
-      - aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
+pre_build:
+commands:
+- echo "Logging in to Amazon ECR"
 
-      - IMAGE_TAG=${CODEBUILD_BUILD_NUMBER}
+```
+  - aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
 
-      - IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}:${IMAGE_TAG}
+  - IMAGE_TAG=${CODEBUILD_BUILD_NUMBER}
 
-      - echo "IMAGE_URI=${IMAGE_URI}"
+  - IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}:${IMAGE_TAG}
 
-      - cd app
-      - npm install
-      - cd ..
+  - echo "IMAGE_URI=${IMAGE_URI}"
 
-  build:
-    commands:
-      - echo "========== GITLEAKS =========="
-      - ./gitleaks detect --no-git --source . --exit-code 1 || true
+  - cd app
+  - npm install
+  - cd ..
+```
 
-      - echo "========== NPM AUDIT =========="
-      - cd app
-      - npm audit --audit-level=high || true
-      - cd ..
+build:
+commands:
 
-      - echo "========== TERRAFORM INIT =========="
-      - terraform -chdir=Terraform/dev init -backend=false
+```
+  - echo "========== GITLEAKS =========="
+  - ./gitleaks detect --no-git --source . --exit-code 0
 
-      - echo "========== TERRAFORM VALIDATE =========="
-      - terraform -chdir=Terraform/dev validate
+  - echo "========== SEMGREP =========="
+  - semgrep scan --config auto .
 
-      - echo "========== CHECKOV =========="
-      - checkov -d Terraform || true
+  - echo "========== TERRAFORM INIT =========="
+  - terraform -chdir=Terraform/dev init -backend=false
 
-      - echo "========== TFSEC =========="
-      - tfsec Terraform || true
+  - echo "========== TERRAFORM VALIDATE =========="
+  - terraform -chdir=Terraform/dev validate
 
-      - echo "========== TRIVY FILESYSTEM SCAN =========="
-      - ./bin/trivy fs . --severity HIGH,CRITICAL --exit-code 0
+  - echo "========== CHECKOV =========="
+  - checkov -d Terraform --soft-fail
 
-      - echo "========== DOCKER BUILD =========="
-      - docker build -t ${IMAGE_URI} ./app
+  - echo "========== TRIVY FILESYSTEM SCAN =========="
+  - ./bin/trivy fs . --severity HIGH,CRITICAL --exit-code 0
 
-      - echo "========== TRIVY IMAGE SCAN =========="
-      - ./bin/trivy image --severity HIGH,CRITICAL --exit-code 0 ${IMAGE_URI}
+  - echo "========== DOCKER BUILD =========="
+  - docker build -t ${IMAGE_URI} ./app
 
-      - echo "========== DOCKER IMAGES =========="
-      - docker images
+  - echo "========== TRIVY IMAGE SCAN =========="
+  - ./bin/trivy image --severity HIGH,CRITICAL --exit-code 0 ${IMAGE_URI}
 
-  post_build:
-    commands:
-      - echo "========== PUSH IMAGE =========="
-      - docker push ${IMAGE_URI}
+  - echo "========== DOCKER IMAGES =========="
+  - docker images
+```
 
-      - echo "========== CREATE IMAGEDEFINITIONS =========="
-      - printf '[{"name":"devsecops-app","imageUri":"%s"}]' ${IMAGE_URI} > imagedefinitions.json
+post_build:
+commands:
+- echo "========== PUSH IMAGE =========="
+- docker push ${IMAGE_URI}
 
-      - echo "========== BUILD COMPLETE =========="
-      - ls -ltr
+```
+  - echo "========== CREATE IMAGEDEFINITIONS =========="
+  - printf '[{"name":"devsecops-app","imageUri":"%s"}]' ${IMAGE_URI} > imagedefinitions.json
 
-      - cat imagedefinitions.json || true
+  - cat imagedefinitions.json
+```
 
 artifacts:
-  files:
-    - imagedefinitions.json
+files:
+- imagedefinitions.json
