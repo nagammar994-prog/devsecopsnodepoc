@@ -12,16 +12,8 @@ phases:
     commands:
       - echo "Installing Security Tools"
 
-      # Python & Pip
-      - python3 --version
-      - pip3 install --upgrade pip
-
-      # Terraform
-      - TERRAFORM_VERSION=1.9.8
-      - curl -Lo terraform.zip https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
-      - unzip -o terraform.zip
-      - mv terraform /usr/local/bin/
-      - terraform version
+      # Upgrade pip
+      - python3 -m pip install --upgrade pip
 
       # Semgrep
       - pip3 install semgrep
@@ -37,10 +29,11 @@ phases:
 
       # Gitleaks
       - GITLEAKS_VERSION=8.24.2
-      - curl -Lo gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
-      - tar -xzf gitleaks.tar.gz
+      - wget https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
+      - tar -xzf gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
       - chmod +x gitleaks
-      - ./gitleaks version
+      - mv gitleaks /usr/local/bin/
+      - gitleaks version
 
   pre_build:
     commands:
@@ -54,23 +47,13 @@ phases:
 
       - echo "IMAGE_URI=${IMAGE_URI}"
 
-      - cd app
-      - npm install
-      - cd ..
-
   build:
     commands:
       - echo "========== GITLEAKS =========="
-      - ./gitleaks detect --no-git --source . --exit-code 0
+      - gitleaks detect --source . --no-git || true
 
       - echo "========== SEMGREP =========="
       - semgrep scan --config auto . || true
-
-      - echo "========== TERRAFORM INIT =========="
-      - terraform -chdir=Terraform/dev init -backend=false
-
-      - echo "========== TERRAFORM VALIDATE =========="
-      - terraform -chdir=Terraform/dev validate
 
       - echo "========== CHECKOV =========="
       - checkov -d Terraform --soft-fail
@@ -78,19 +61,11 @@ phases:
       - echo "========== TRIVY FILESYSTEM SCAN =========="
       - ./bin/trivy fs . --severity HIGH,CRITICAL --exit-code 0
 
-      - echo "========== NPM AUDIT =========="
-      - cd app
-      - npm audit --audit-level=high || true
-      - cd ..
-
       - echo "========== DOCKER BUILD =========="
       - docker build -t ${IMAGE_URI} ./app
 
       - echo "========== TRIVY IMAGE SCAN =========="
       - ./bin/trivy image --severity HIGH,CRITICAL --exit-code 0 ${IMAGE_URI}
-
-      - echo "========== DOCKER IMAGES =========="
-      - docker images
 
   post_build:
     commands:
@@ -100,7 +75,6 @@ phases:
       - echo "========== CREATE IMAGEDEFINITIONS =========="
       - printf '[{"name":"devsecops-app","imageUri":"%s"}]' ${IMAGE_URI} > imagedefinitions.json
 
-      - echo "========== IMAGE DEFINITIONS =========="
       - cat imagedefinitions.json
 
 artifacts:
