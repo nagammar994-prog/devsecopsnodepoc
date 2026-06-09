@@ -73,7 +73,7 @@ variable "scan_on_push" {
 
 variable "image_tag_mutability" {
   type    = string
-  default = "MUTABLE"
+  default = "IMMUTABLE"
 }
 
 # ECS Variables
