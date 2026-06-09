@@ -6,6 +6,8 @@ resource "aws_lb" "alb" {
   security_groups = var.alb_security_group_ids
   subnets         = var.subnet_ids
 
+  drop_invalid_header_fields = true
+
   tags = var.tags
 }
 
