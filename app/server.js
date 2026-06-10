@@ -4,7 +4,7 @@ const helmet = require("helmet");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Remove Express fingerprint
+// Hide Express fingerprint
 app.disable("x-powered-by");
 
 // Security headers
@@ -14,7 +14,7 @@ app.use(
   })
 );
 
-// Additional headers
+// Additional security headers
 app.use((req, res, next) => {
   res.setHeader(
     "Permissions-Policy",
@@ -65,6 +65,6 @@ app.get("/health", (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(\`Server running on port \${PORT}\`);
 });
