@@ -25,34 +25,43 @@ def load_json(path):
     try:
         with open(path, "r") as f:
             return json.load(f)
-    except Exception:
+    except Exception as e:
+        print(f"Unable to parse {path}: {e}")
         return None
 
 
-# ---------------------------
-# Semgrep
-# ---------------------------
+def get_severity(value, default="LOW"):
+    return str(value or default).upper()
+
+
+# =====================================================
+# SEMGREP
+# =====================================================
 
 semgrep = load_json(f"{REPORTS_DIR}/semgrep.json")
 
 if semgrep:
+
     findings = semgrep.get("results", [])
+
     tool_counts["Semgrep"] = len(findings)
 
     for finding in findings:
-        sev = (
-            finding.get("extra", {})
-            .get("severity", "LOW")
-            .upper()
+
+        sev = get_severity(
+            finding.get("extra", {}).get("severity"),
+            "LOW"
         )
 
         if sev in severity_counts:
             severity_counts[sev] += 1
+        else:
+            severity_counts["LOW"] += 1
 
 
-# ---------------------------
-# Checkov
-# ---------------------------
+# =====================================================
+# CHECKOV
+# =====================================================
 
 checkov = load_json(f"{REPORTS_DIR}/checkov.json")
 
@@ -67,9 +76,17 @@ if checkov:
 
     for finding in failed_checks:
 
-        sev = (
-            finding.get("severity", "MEDIUM")
-            .upper()
+        severity = finding.get("severity")
+
+        # Newer Checkov versions sometimes return:
+        # {"severity":{"level":"HIGH"}}
+
+        if isinstance(severity, dict):
+            severity = severity.get("level")
+
+        sev = get_severity(
+            severity,
+            "MEDIUM"
         )
 
         if sev in severity_counts:
@@ -78,53 +95,83 @@ if checkov:
             severity_counts["MEDIUM"] += 1
 
 
-# ---------------------------
-# Trivy Filesystem
-# ---------------------------
+# =====================================================
+# TRIVY FILESYSTEM
+# =====================================================
 
-trivy_fs = load_json(f"{REPORTS_DIR}/trivy-fs.json")
+trivy_fs = load_json(
+    f"{REPORTS_DIR}/trivy-fs.json"
+)
 
 if trivy_fs:
 
     for result in trivy_fs.get("Results", []):
 
-        vulns = result.get("Vulnerabilities", [])
+        vulns = result.get(
+            "Vulnerabilities",
+            []
+        ) or []
 
         tool_counts["Trivy FS"] += len(vulns)
 
         for vuln in vulns:
 
-            sev = vuln.get("Severity", "LOW")
+            sev = get_severity(
+                vuln.get("Severity"),
+                "LOW"
+            )
 
             if sev in severity_counts:
                 severity_counts[sev] += 1
 
 
-# ---------------------------
-# Trivy Image
-# ---------------------------
+# =====================================================
+# TRIVY IMAGE
+# =====================================================
 
-trivy_img = load_json(f"{REPORTS_DIR}/trivy-image.json")
+trivy_image = load_json(
+    f"{REPORTS_DIR}/trivy-image.json"
+)
 
-if trivy_img:
+if trivy_image:
 
-    for result in trivy_img.get("Results", []):
+    for result in trivy_image.get("Results", []):
 
-        vulns = result.get("Vulnerabilities", [])
+        vulns = result.get(
+            "Vulnerabilities",
+            []
+        ) or []
 
         tool_counts["Trivy Image"] += len(vulns)
 
         for vuln in vulns:
 
-            sev = vuln.get("Severity", "LOW")
+            sev = get_severity(
+                vuln.get("Severity"),
+                "LOW"
+            )
 
             if sev in severity_counts:
                 severity_counts[sev] += 1
 
 
-# ---------------------------
-# Action Plan
-# ---------------------------
+# =====================================================
+# SECURITY SCORE
+# =====================================================
+
+score = max(
+    0,
+    100
+    - (severity_counts["CRITICAL"] * 10)
+    - (severity_counts["HIGH"] * 5)
+    - (severity_counts["MEDIUM"] * 2)
+    - (severity_counts["LOW"] * 1)
+)
+
+
+# =====================================================
+# ACTION PLAN
+# =====================================================
 
 actions = []
 
@@ -135,69 +182,75 @@ if severity_counts["CRITICAL"] > 0:
 
 if severity_counts["HIGH"] > 0:
     actions.append(
-        "Remediate HIGH severity findings before release."
+        "Fix HIGH severity findings before production deployment."
     )
 
 if severity_counts["MEDIUM"] > 0:
     actions.append(
-        "Review MEDIUM findings and create backlog items."
+        "Create backlog tasks for MEDIUM severity findings."
     )
 
 if not actions:
     actions.append(
-        "No significant security findings detected."
+        "No significant findings detected."
     )
 
 
-# ---------------------------
-# Generate HTML
-# ---------------------------
+# =====================================================
+# DEBUG OUTPUT
+# =====================================================
+
+print("Severity Counts:")
+print(severity_counts)
+
+print("Tool Counts:")
+print(tool_counts)
+
+print(f"Security Score: {score}")
+
+
+# =====================================================
+# HTML DASHBOARD
+# =====================================================
 
 html = f"""
 <!DOCTYPE html>
 <html>
 <head>
+
 <title>DevSecOps Security Dashboard</title>
 
 <style>
 
 body {{
     font-family: Arial, sans-serif;
-    background: #f4f6f8;
-    margin: 20px;
-}}
-
-h1 {{
-    color: #1f2937;
-}}
-
-.cards {{
-    display:flex;
-    gap:20px;
-    flex-wrap:wrap;
+    background:#f4f6f8;
+    margin:30px;
 }}
 
 .card {{
+    display:inline-block;
+    width:220px;
+    margin:10px;
+    padding:20px;
     background:white;
     border-radius:10px;
-    padding:20px;
-    width:220px;
     box-shadow:0 2px 8px rgba(0,0,0,.1);
 }}
 
 .big {{
-    font-size:32px;
+    font-size:36px;
     font-weight:bold;
 }}
 
 table {{
     width:100%;
     border-collapse:collapse;
-    margin-top:20px;
     background:white;
+    margin-top:20px;
 }}
 
-th, td {{
+th,td {{
     padding:12px;
     border:1px solid #ddd;
 }}
@@ -206,21 +259,22 @@ th {{
     background:#f3f4f6;
 }}
 
-.action {{
-    background:white;
-    padding:20px;
-    margin-top:20px;
-    border-radius:10px;
+.section {{
+    margin-top:30px;
 }}
 
 </style>
+
 </head>
 
 <body>
 
 <h1>DevSecOps Security Dashboard</h1>
 
-<div class="cards">
+<div class="card">
+<h3>Security Score</h3>
+<div class="big">{score}</div>
+</div>
 
 <div class="card">
 <h3>Critical</h3>
@@ -242,11 +296,11 @@ th {{
 <div class="big">{severity_counts["LOW"]}</div>
 </div>
 
-</div>
-
-<h2>Tool Findings</h2>
+<div class="section">
+<h2>Findings By Tool</h2>
 
 <table>
+
 <tr>
 <th>Tool</th>
 <th>Findings</th>
@@ -273,9 +327,9 @@ th {{
 </tr>
 
 </table>
+</div>
 
-<div class="action">
-
+<div class="section">
 <h2>Recommended Action Plan</h2>
 
 <ul>
