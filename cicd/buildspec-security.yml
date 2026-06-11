@@ -1,103 +1,117 @@
 version: 0.2
 
 env:
-  variables:
-    IMAGE_REPO_NAME: "devsecops-poc"
-    ARTIFACT_BUCKET: "devsecops-artifacts-dev"
+variables:
+IMAGE_REPO_NAME: "devsecops-poc"
+ARTIFACT_BUCKET: "devsecops-artifacts-dev"
 
 phases:
-  install:
-    runtime-versions:
-      nodejs: 18
 
-    commands:
-      - echo "Installing Security Tools"
+install:
+runtime-versions:
+nodejs: 18
 
-      - python3 -m pip install --upgrade pip
-      - pip3 install semgrep checkov pandas jinja2
+```
+commands:
+  - echo "Installing Security Tools"
 
-      - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
+  # Upgrade pip
+  - python3 -m pip install --upgrade pip -q
 
-      - GITLEAKS_VERSION=8.24.2
-      - wget -q https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
-      - tar -xzf gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
-      - chmod +x gitleaks
-      - mv gitleaks /usr/local/bin/
+  # Install Semgrep & Checkov
+  - pip3 install -q semgrep checkov
 
-  pre_build:
-    commands:
-      - aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
+  # Install Trivy
+  - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh > /dev/null 2>&1
 
-      - export IMAGE_TAG=${CODEBUILD_BUILD_NUMBER}
-      - export BUILD_ID=${CODEBUILD_BUILD_NUMBER}
+  # Install Gitleaks
+  - GITLEAKS_VERSION=8.24.2
+  - wget -q https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
+  - tar -xzf gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
+  - chmod +x gitleaks
+  - mv gitleaks /usr/local/bin/
 
-      - export IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}:${IMAGE_TAG}
+  # Minimal version verification
+  - echo "Tool Versions:"
+  - semgrep --version
+  - checkov --version
+  - ./bin/trivy --version
+  - gitleaks version
+```
 
-      - mkdir -p reports
+pre_build:
+commands:
 
-      - echo "IMAGE_URI=${IMAGE_URI}"
+```
+  - echo "Preparing Build"
 
-  build:
-    commands:
+  - mkdir -p reports
 
-      - echo "========== GITLEAKS =========="
-      - gitleaks detect --source . --no-git || true
+  - export BUILD_ID=${CODEBUILD_BUILD_NUMBER}
+  - export IMAGE_TAG=${CODEBUILD_BUILD_NUMBER}
 
-      - echo "========== SEMGREP =========="
-      - semgrep scan --config auto . --json --output reports/semgrep.json || true
+  - export IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}:${IMAGE_TAG}
 
-      - echo "========== CHECKOV =========="
-      - checkov -d Terraform -o json --soft-fail > reports/checkov.json || true
+  - echo "Logging in to Amazon ECR"
 
-      - echo "========== TRIVY FILESYSTEM SCAN =========="
-      - ./bin/trivy fs . --severity HIGH,CRITICAL --format json -o reports/trivy-fs.json --exit-code 0
+  - aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
 
-      - echo "========== DOCKER BUILD =========="
-      - docker build -t ${IMAGE_URI} ./app
+  - echo "IMAGE_URI=${IMAGE_URI}"
+```
 
-      - echo "========== TRIVY IMAGE SCAN =========="
-      - ./bin/trivy image ${IMAGE_URI} --severity HIGH,CRITICAL --format json -o reports/trivy-image.json --exit-code 0
+build:
+commands:
 
-      - echo "========== VERIFY REPORTS =========="
-      - ls -ltr reports
+```
+  - echo "Running Security Scans"
 
-      - echo "========== GENERATE SECURITY DASHBOARD =========="
-      - |
-        cat > reports/security-dashboard.html <<EOF
-        <html>
-        <head>
-          <title>DevSecOps Security Dashboard</title>
-        </head>
-        <body>
-          <h1>DevSecOps Security Dashboard</h1>
-          <p>Build Number: ${BUILD_ID}</p>
-        </body>
-        </html>
-        EOF
+  # Gitleaks
+  - gitleaks detect --source . --no-git --report-format json --report-path reports/gitleaks.json || true
 
-  post_build:
-    commands:
+  # Semgrep
+  - semgrep scan --config auto --quiet --json --output reports/semgrep.json || true
 
-      - echo "========== UPLOAD SECURITY REPORTS =========="
+  # Checkov
+  - checkov -d Terraform --quiet -o json --soft-fail > reports/checkov.json || true
 
-      - test -f reports/semgrep.json && aws s3 cp reports/semgrep.json s3://${ARTIFACT_BUCKET}/security-dashboard/build-${BUILD_ID}/semgrep.json || true
+  # Trivy Filesystem
+  - ./bin/trivy fs . --scanners vuln --quiet --severity HIGH,CRITICAL --format json -o reports/trivy-fs.json
 
-      - test -f reports/checkov.json && aws s3 cp reports/checkov.json s3://${ARTIFACT_BUCKET}/security-dashboard/build-${BUILD_ID}/checkov.json || true
+  # Docker Build
+  - echo "Building Docker Image"
+  - docker build -t ${IMAGE_URI} ./app
 
-      - test -f reports/trivy-fs.json && aws s3 cp reports/trivy-fs.json s3://${ARTIFACT_BUCKET}/security-dashboard/build-${BUILD_ID}/trivy-fs.json || true
+  # Trivy Image Scan
+  - ./bin/trivy image ${IMAGE_URI} --scanners vuln --quiet --severity HIGH,CRITICAL --format json -o reports/trivy-image.json
 
-      - test -f reports/trivy-image.json && aws s3 cp reports/trivy-image.json s3://${ARTIFACT_BUCKET}/security-dashboard/build-${BUILD_ID}/trivy-image.json || true
+  # Verify Reports
+  - echo "Generated Reports"
+  - ls -lh reports
 
-      - test -f reports/security-dashboard.html && aws s3 cp reports/security-dashboard.html s3://${ARTIFACT_BUCKET}/security-dashboard/build-${BUILD_ID}/security-dashboard.html || true
+  # Dashboard Generation
+  - echo "Generating Dashboard"
+  - python3 cicd/dashboard.py
+```
 
-      - echo "========== PUSH IMAGE =========="
-      - docker push ${IMAGE_URI}
+post_build:
+commands:
 
-      - echo "========== CREATE IMAGEDEFINITIONS =========="
-      - printf '[{"name":"devsecops-app","imageUri":"%s"}]' ${IMAGE_URI} > imagedefinitions.json
+```
+  - echo "Uploading Reports"
 
-      - cat imagedefinitions.json
+  - aws s3 cp reports/ s3://${ARTIFACT_BUCKET}/security-dashboard/build-${BUILD_ID}/ --recursive
+
+  - echo "Pushing Docker Image"
+
+  - docker push ${IMAGE_URI}
+
+  - echo "Creating ECS Artifact"
+
+  - printf '[{"name":"devsecops-app","imageUri":"%s"}]' ${IMAGE_URI} > imagedefinitions.json
+
+  - cat imagedefinitions.json
+```
 
 artifacts:
-  files:
-    - imagedefinitions.json
+files:
+- imagedefinitions.json
