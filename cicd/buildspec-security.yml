@@ -3,6 +3,7 @@ version: 0.2
 env:
   variables:
     IMAGE_REPO_NAME: "devsecops-poc"
+    ARTIFACT_BUCKET: "devsecops-artifacts-dev"
 
 phases:
   install:
@@ -12,15 +13,14 @@ phases:
     commands:
       - echo "Installing Security Tools"
 
-      # Upgrade pip
+      # Python
       - python3 -m pip install --upgrade pip
+      - pip3 install semgrep checkov pandas jinja2
 
       # Semgrep
-      - pip3 install semgrep
       - semgrep --version
 
       # Checkov
-      - pip3 install checkov
       - checkov --version
 
       # Trivy
@@ -45,6 +45,10 @@ phases:
 
       - export IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}:${IMAGE_TAG}
 
+      - export BUILD_ID=${CODEBUILD_BUILD_NUMBER}
+
+      - mkdir -p reports
+
       - echo "IMAGE_URI=${IMAGE_URI}"
 
   build:
@@ -53,22 +57,73 @@ phases:
       - gitleaks detect --source . --no-git || true
 
       - echo "========== SEMGREP =========="
-      - semgrep scan --config auto . || true
+      - semgrep scan --config auto . --json --output reports/semgrep.json || true
 
       - echo "========== CHECKOV =========="
-      - checkov -d Terraform --soft-fail
+      - checkov -d Terraform -o json --output-file-path reports/checkov.json --soft-fail
 
       - echo "========== TRIVY FILESYSTEM SCAN =========="
-      - ./bin/trivy fs . --severity HIGH,CRITICAL --exit-code 0
+      - ./bin/trivy fs . --severity HIGH,CRITICAL --format json -o reports/trivy-fs.json --exit-code 0
 
       - echo "========== DOCKER BUILD =========="
       - docker build -t ${IMAGE_URI} ./app
 
       - echo "========== TRIVY IMAGE SCAN =========="
-      - ./bin/trivy image --severity HIGH,CRITICAL --exit-code 0 ${IMAGE_URI}
+      - ./bin/trivy image ${IMAGE_URI} --severity HIGH,CRITICAL --format json -o reports/trivy-image.json --exit-code 0
+
+      - echo "========== GENERATE SECURITY DASHBOARD =========="
+      - |
+        cat > reports/security-dashboard.html <<EOF
+        <html>
+        <head>
+          <title>DevSecOps Security Dashboard</title>
+          <style>
+            body { font-family: Arial; margin: 40px; }
+            .card {
+              border: 1px solid #ddd;
+              padding: 20px;
+              margin: 10px;
+              border-radius: 8px;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>DevSecOps Security Dashboard</h1>
+          <p>Build Number: ${BUILD_ID}</p>
+
+          <div class="card">
+            <h2>Reports Generated</h2>
+            <ul>
+              <li>Semgrep</li>
+              <li>Checkov</li>
+              <li>Trivy Filesystem</li>
+              <li>Trivy Image</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h2>Artifacts</h2>
+            <p>Detailed findings available in JSON reports.</p>
+          </div>
+
+        </body>
+        </html>
+        EOF
 
   post_build:
     commands:
+      - echo "========== UPLOAD SECURITY REPORTS =========="
+
+      - aws s3 cp reports/semgrep.json s3://${ARTIFACT_BUCKET}/security-dashboard/build-${BUILD_ID}/semgrep.json
+
+      - aws s3 cp reports/checkov.json s3://${ARTIFACT_BUCKET}/security-dashboard/build-${BUILD_ID}/checkov.json
+
+      - aws s3 cp reports/trivy-fs.json s3://${ARTIFACT_BUCKET}/security-dashboard/build-${BUILD_ID}/trivy-fs.json
+
+      - aws s3 cp reports/trivy-image.json s3://${ARTIFACT_BUCKET}/security-dashboard/build-${BUILD_ID}/trivy-image.json
+
+      - aws s3 cp reports/security-dashboard.html s3://${ARTIFACT_BUCKET}/security-dashboard/build-${BUILD_ID}/security-dashboard.html
+
       - echo "========== PUSH IMAGE =========="
       - docker push ${IMAGE_URI}
 
