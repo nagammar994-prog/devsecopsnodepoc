@@ -65,7 +65,7 @@ phases:
       - find reports -type f
 
       - echo "Generating Dashboard"
-      - test -f cicd/dashboard.py && python3 cicd/dashboard.py || echo "Dashboard script not found"
+      - python3 cicd/dashboard.py
 
   post_build:
     commands:
